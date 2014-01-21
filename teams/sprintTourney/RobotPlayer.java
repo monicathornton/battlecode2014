@@ -95,6 +95,12 @@ public class RobotPlayer{
 		if(rc.isActive() && rc.canMove(spawnDir) && rc.senseRobotCount() < GameConstants.MAX_ROBOTS)	//usual checks (can we spawn)
 		{
 			rc.spawn(spawnDir);	//Spawn in the random direction
+
 		}
 	}
+	
+
+	
+	
+	
 }
