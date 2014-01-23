@@ -24,6 +24,8 @@ public class RobotPlayer{
 	static MapLocation rallyPoint;
 	static MapLocation targetedPastr;
 	static boolean die = false;
+	//MT ADDED
+	static MapLocation myPastr;
 	
 	//SOLDIER data:
 	static int myBand = 100;
@@ -39,16 +41,37 @@ public class RobotPlayer{
 			rc.broadcast(101,VectorFunctions.locToInt(VectorFunctions.mldivide(rc.senseHQLocation(),bigBoxSize)));//this tells soldiers to stay near HQ to start
 			rc.broadcast(102,-1);//and to remain in squad 1
 			tryToSpawn();
+
+			//sends robot on a milk hunt	
 			rallyPoint = milkHunt();
-			rallyPoint = VectorFunctions.bigBoxCenter(rallyPoint, bigBoxSize);
+			//rallyPoint = VectorFunctions.bigBoxCenter(rallyPoint, pathCreatedRound);
+			//mt changed
+			VectorFunctions.bigBoxCenter(rallyPoint, pathCreatedRound);
 			BreadthFirst.init(rc, bigBoxSize);
+			pathCreatedRound++;
+
+	
+			
 			//MT COMMENTED OUT for V2
 			//rallyPoint = VectorFunctions.mladd(VectorFunctions.mldivide(VectorFunctions.mlsubtract(rc.senseEnemyHQLocation(),rc.senseHQLocation()),3),rc.senseHQLocation());
 			//rallyPoint = milkHunt();
 			//rallyPoint = VectorFunctions.bigBoxCenter(rallyPoint, pathCreatedRound);
 		}else{
 			BreadthFirst.rc=rcIn;//slimmed down init
+			//v3 out from here to
 			//MT ADDED for V2
+			rallyPoint = VectorFunctions.mladd(VectorFunctions.mldivide(VectorFunctions.mlsubtract(rc.senseEnemyHQLocation(),rc.senseHQLocation()),3),rc.senseHQLocation());
+			
+			//rallyPoint = milkHunt();
+			//rallyPoint = VectorFunctions.bigBoxCenter(rallyPoint, bigBoxSize);
+			//mt added
+
+			rallyPoint = VectorFunctions.bigBoxCenter(rallyPoint, pathCreatedRound);
+			rallyPoint = VectorFunctions.bigBoxCenter(rallyPoint, bigBoxSize);
+			//BreadthFirst.init(rc, bigBoxSize);
+			//here
+			pathCreatedRound++;
+			
 			//rallyPoint = VectorFunctions.mladd(VectorFunctions.mldivide(VectorFunctions.mlsubtract(rc.senseEnemyHQLocation(),rc.senseHQLocation()),3),rc.senseHQLocation());
 			//rallyPoint = milkHunt();
 		}
@@ -58,6 +81,7 @@ public class RobotPlayer{
 		
 
 		while(true){
+			//rc.yield();
 			try{
 				if(rc.getType()==RobotType.HQ){
 					runHQ();
@@ -69,25 +93,21 @@ public class RobotPlayer{
 			}catch (Exception e){
 				e.printStackTrace();
 			}
-			//MT COMMENTED OUT FOR V2
 			rc.yield();
 		}
 	}
 	
 	private static void runHQ() throws GameActionException {
-		//TODO consider updating the rally point to an allied pastr 
-
 		Robot[] alliedRobots = rc.senseNearbyGameObjects(Robot.class,100000000,rc.getTeam());
 		
 		//if my team is defeated, regroup at main base:
 		if(Clock.getRoundNum()>400&&alliedRobots.length<5){//call a retreat
 			MapLocation startPoint = findAverageAllyLocation(alliedRobots);
-			Comms.findPathAndBroadcast(2,startPoint,rc.senseHQLocation(),bigBoxSize,2);
+			Comms.findPathAndBroadcast(2,startPoint,rc.senseHQLocation(),bigBoxSize, 2);
 			rallyPoint = rc.senseHQLocation();
 		}else{//not retreating
 			//tell them to go to the rally point
 			Comms.findPathAndBroadcast(1,rc.getLocation(),rallyPoint,bigBoxSize,2);
-
 			//if the enemy builds a pastr, tell sqaud 2 to go there.
 			MapLocation[] enemyPastrs = rc.sensePastrLocations(rc.getTeam().opponent());
 			if(enemyPastrs.length>0){
@@ -96,9 +116,7 @@ public class RobotPlayer{
 				//broadcast it
 				Comms.findPathAndBroadcast(2,startPoint,targetedPastr,bigBoxSize,2);
 			}
-		}
-		
-		
+		}	
 		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10000,rc.getTeam().opponent());
 		
 		if(rc.isActive()&&enemyRobots.length>0){
@@ -107,7 +125,6 @@ public class RobotPlayer{
 			if(rc.canAttackSquare(closestEnemyLoc))
 				rc.attackSquare(closestEnemyLoc);
 		}
-
 		//after telling them where to go, consider spawning
 		tryToSpawn();
 	}
@@ -166,34 +183,30 @@ public class RobotPlayer{
 				if((alliedRobots.length+1)>=enemyRobots.length){//attack when you have superior numbers
 					attackClosest(closestEnemyLoc);
 				}else{//otherwise regroup
+					if (closeEnoughToShoot) {
+						rc.attackSquare(closestEnemyLoc);
+					}
 					regroup(enemyRobots,alliedRobots,closestEnemyLoc);
 				}
 			}
 		}else{//NAVIGATION BY DOWNLOADED PATH
 			navigateByPath(alliedRobots);
-		//Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-		//BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections);//was Direction.SOUTH_EAST
-		
-		//Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-		//simpleMove(towardEnemy);
 		}
 	}
 	
 	private static void navigateByPath(Robot[] alliedRobots) throws GameActionException{
-		if(path.size()<=1){//
+		if(path.size()<=1){
 			//check if a new path is available
 			int broadcastCreatedRound = rc.readBroadcast(myBand);
 			if(pathCreatedRound<broadcastCreatedRound){//download new place to go
 				pathCreatedRound = broadcastCreatedRound;
 				path = Comms.downloadPath();
 			}else{//just waiting around. Consider building a pastr
-								considerBuildingPastr(alliedRobots);
-								//mt added v2
-								if (RobotType.NOISETOWER.isBuilding == false && RobotType.NOISETOWER.count < 5 && RobotType.PASTR.isBuilding == true) {
-								rc.construct(RobotType.NOISETOWER);
-								}
+					considerBuildingPastr(alliedRobots);
+					//MT ADD FOR NOISE TOWER, ONCE GET MATHEW'S CODE
 			}
 		}
+		
 		if(path.size()>0){
 			//follow breadthFirst path...
 			Direction bdir = BreadthFirst.getNextDirection(path, bigBoxSize);
@@ -222,24 +235,29 @@ public class RobotPlayer{
 								buildPastr(checkLoc);
 							}else{
 								MapLocation closestAlliedPastr = VectorFunctions.findClosest(alliedPastrs, checkLoc);
-								//MT CHANGED v2
-								//if(closestAlliedPastr.distanceSquaredTo(checkLoc)>GameConstants.PASTR_RANGE*5){
+								//MT CHANGED for v2 (from 5 to 10)
 								if(closestAlliedPastr.distanceSquaredTo(checkLoc)>GameConstants.PASTR_RANGE*10){
 									buildPastr(checkLoc);
 									}
-								//end MT adds
+								}
+
+							
+								//}
+									//}								
 								
+								
+								
+								
+								//end MT adds							
 							}
 						}
 					}
 				}
 			}
 		}
-	}
-
+	
 	private static void buildPastr(MapLocation checkLoc) throws GameActionException {
 		rc.broadcast(50, Clock.getRoundNum());
-		//MT COMMENTED OUT FOR v2
 		for(int i=0;i<100;i++){//for 100 rounds, try to build a pastr
 		if(rc.isActive()){
 				if(rc.getLocation().equals(checkLoc)){
@@ -247,12 +265,30 @@ public class RobotPlayer{
 				}else{
 					Direction towardCows = rc.getLocation().directionTo(checkLoc);
 					BasicPathing.tryToMove(towardCows, true,true,true);
-				}
+				}	
 			}
-		rc.yield();
+		rc.yield();		
 		}
 	}
 
+	//CHANGE WITH MATHEW'S NOISE TOWER CODE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	private static void buildTower(MapLocation checkLoc) throws GameActionException {
+		//rc.broadcast(50, Clock.getRoundNum());
+		//MT COMMENTED OUT FOR v2
+		for(int i=0;i<200;i++){//for 100 rounds, try to build a pastr
+		if(rc.isActive()){
+				if(rc.getLocation().equals(checkLoc)){
+					rc.construct(RobotType.NOISETOWER);
+					rc.attackSquare(targetedPastr);				
+				}else{
+					Direction towardCows = rc.getLocation().directionTo(checkLoc);
+					BasicPathing.tryToMove(towardCows, true,true,true);
+				}				
+			}
+		rc.yield();	
+		}
+	}
+	
 	private static void regroup(Robot[] enemyRobots, Robot[] alliedRobots,MapLocation closestEnemyLoc) throws GameActionException {
 		int enemyAttackRangePlusBuffer = (int) Math.pow((Math.sqrt(rc.getType().attackRadiusMaxSquared)+1),2);
 		if(closestEnemyLoc.distanceSquaredTo(rc.getLocation())<=enemyAttackRangePlusBuffer){//if within attack range, back up
@@ -274,28 +310,10 @@ public class RobotPlayer{
 			}
 		}else{//not close enough to shoot, so try to go shoot
 			Direction towardClosest = rc.getLocation().directionTo(closestEnemyLoc);
-			BasicPathing.tryToMove(towardClosest, true,true, false);
+			BasicPathing.tryToMove(towardClosest, true,true,false);
 		}
 	}
 	
-/*MT COMMENTED OUT FOR V2 b/c not using
-	private static MapLocation getRandomLocation() {
-		return new MapLocation(randall.nextInt(rc.getMapWidth()),randall.nextInt(rc.getMapHeight()));
-	}
-/* MT COMMENTED OUT FOR V2 b/c not using
-	private static void simpleMove(Direction chosenDirection) throws GameActionException{
-		if(rc.isActive()){
-			for(int directionalOffset:directionalLooks){
-				int forwardInt = chosenDirection.ordinal();
-				Direction trialDir = allDirections[(forwardInt+directionalOffset+8)%8];
-				if(rc.canMove(trialDir)){
-					rc.move(trialDir);
-					break;
-				}
-			}
-		}
-	}
-*/	
 	//find where milk is growing the most, head on over there!
 	private static MapLocation milkHunt() {
 		double[][] lotsOfCows = rc.senseCowGrowth();
