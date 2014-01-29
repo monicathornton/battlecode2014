@@ -1,0 +1,161 @@
+package team105;
+
+import battlecode.common.*;
+
+import java.util.Random;
+
+public class RobotPlayer{
+
+	public static RobotController rc;								//We know what this is
+	static Direction allDirections[] = Direction.values();			//randomly selects direction	
+	static MapLocation pastrs[];
+	static Random rng = new Random();								//used for Random Number Generation (R-N-G)		
+	static MapLocation target;		
+	static int d = 0;
+	static boolean init = true;
+	static boolean deny = false;
+	static RobotInfo anEnemyInfo;
+	static Robot anEnemy;
+	
+	//This code has the noise towers skip off-map sweeps (speeds up gathering)
+	//Going to add moving away from HQ before constructing
+	//Working on soldiers denying pastrs
+  //HQ wears hat also :3
+
+	public static void run(RobotController rc_in)
+	{		
+		rc = rc_in;
+		rng.setSeed(rc.getRobot().getID());							//random AI based on Robot's unique ID	
+		if (init == true){
+			target = rc.getLocation();
+			target = target.add(allDirections[d], 17);
+			init = false;
+		}
+
+		while(true)
+		{
+			try{
+				if(rc.getType()==RobotType.HQ){						//Existential HQ (Who am I?)				
+					runHeadquarters();
+
+				}else if(rc.getType()==RobotType.SOLDIER){			//Thick Headed Soldier (Where do I go?)				
+					runSoldier();
+
+				}else if(rc.getType() == RobotType.NOISETOWER){
+					runNoiseTower();
+
+				}
+				rc.yield();
+			}
+			catch (Exception e){		
+				e.printStackTrace();
+			}
+		}
+	}
+
+
+
+	private static void runNoiseTower() throws GameActionException
+	{		
+		boolean attack = false;
+		if(deny == false){
+			if (rc.getLocation().isAdjacentTo(target) || rc.senseTerrainTile(target) == TerrainTile.OFF_MAP){			
+				if(d >= 7){
+					d = 0;							
+				}else{
+					d++;
+				}
+				target = rc.getLocation();
+				if(d%2 == 0)
+					target = target.add(allDirections[d],17);
+				if(d%2 != 0)
+					target = target.add(allDirections[d], 12);
+			}
+
+			if(rc.isActive() && rc.canAttackSquare(target)){
+				rc.attackSquare(target);
+				target = target.subtract(allDirections[d]);
+			}
+		}
+		//		}else{
+		//			Robot[] enemies = rc.senseNearbyGameObjects(Robot.class, 10, rc.getTeam().opponent());
+		//			if(enemies.length > 0){
+		//				for(int i = 0; i < enemies.length; i++){
+		//					anEnemy = enemies[i];
+		//					anEnemyInfo = rc.senseRobotInfo(anEnemy);
+		//					if(anEnemyInfo.type == rc.getType().PASTR && anEnemyInfo.location.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){
+		//						attack = true;
+		//						break;						
+		//						}
+		//					}
+		//				if(rc.isActive() && attack){
+		//					rc.attackSquare(anEnemyInfo.location);
+		//				}				
+		//			}
+		//		}
+	}
+
+
+
+
+
+	private static void runSoldier() throws GameActionException 
+	{		
+		if(rc.senseRobotCount() < 2)
+			if(rc.isActive())
+				rc.construct(RobotType.NOISETOWER);
+		if(rc.senseRobotCount() < 4)
+			if(rc.isActive())
+				rc.construct(RobotType.PASTR);		
+
+		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10,rc.getTeam().opponent());
+		if(enemyRobots.length > 0){//if there are enemies
+			Robot anEnemy = enemyRobots[0];
+			RobotInfo anEnemyInfo;
+			try {
+				anEnemyInfo = rc.senseRobotInfo(anEnemy);
+				if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){
+					if(rc.isActive()){
+						rc.attackSquare(anEnemyInfo.location);
+					}
+				}
+			} catch (GameActionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		Direction d = allDirections[rng.nextInt(8) + 1];
+		//Direction d = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+		if(rc.isActive() && rc.canMove(d))		
+			rc.sneak(d);
+	}
+
+
+	private static void runHeadquarters() throws GameActionException 
+	{
+		int t = Clock.getRoundNum();
+		if(t <= 1){
+			rc.wearHat();
+		}
+		Robot[] enemies = rc.senseNearbyGameObjects(Robot.class, 10, rc.getTeam().opponent());
+		if(enemies.length > 0){
+			Robot anEnemy = enemies[0];
+			RobotInfo anEnemyInfo;
+			try{
+				anEnemyInfo = rc.senseRobotInfo(anEnemy);
+
+				if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){
+					if(rc.isActive()){
+						rc.attackSquare(anEnemyInfo.location);
+					}
+				}
+			}catch (Exception e){
+				System.out.println(e);
+			}
+		}
+
+		Direction spawnDir = allDirections[rng.nextInt(8) + 1];											//pick a random spawn direction
+		if(rc.isActive() && rc.canMove(spawnDir) && rc.senseRobotCount() < GameConstants.MAX_ROBOTS)	//usual checks (can we spawn)		{
+			rc.spawn(spawnDir);	
+	}
+}
