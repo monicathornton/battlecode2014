@@ -3,10 +3,10 @@ package team105;
 import battlecode.common.*;
 
 public class MapAssessment{
-	
+
 	public static int[][] coarseMap;
 	public static int bigBoxSize;
-	
+
 	public static void assessMap(int bigBoxSizeIn,RobotController rc){
 		bigBoxSize=bigBoxSizeIn;
 		int coarseWidth = rc.getMapWidth()/bigBoxSize;
@@ -23,7 +23,7 @@ public class MapAssessment{
 		int terrainOrdinal = rc.senseTerrainTile(new MapLocation(x,y)).ordinal();//0 NORMAL, 1 ROAD, 2 VOID, 3 OFF_MAP
 		return (terrainOrdinal<2?0:1);
 	}
-	
+
 	public static void printCoarseMap(){
 		System.out.println("Coarse map:");
 		for(int x=0;x<coarseMap[0].length;x++){
@@ -34,7 +34,7 @@ public class MapAssessment{
 			System.out.println();
 		}
 	}
-	
+
 
 	public static void printBigCoarseMap(RobotController rc){
 		//System.out.println("Fine map:");
@@ -51,5 +51,5 @@ public class MapAssessment{
 			//System.out.println();
 		//}
 	}
-	
+
 }

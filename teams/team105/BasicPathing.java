@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import battlecode.common.*;
 
 public class BasicPathing{
-	
+
 	static ArrayList<MapLocation> snailTrail = new ArrayList<MapLocation>();
-	
+
 	public static boolean canMove(Direction dir, boolean selfAvoiding, boolean avoidEnemyHQ){
 		//include both rc.canMove and the snail Trail requirements
 		MapLocation resultingLocation = RobotPlayer.rc.getLocation().add(dir);
@@ -27,11 +27,11 @@ public class BasicPathing{
 		//if you get through the loop, then dir is not adjacent to the icky snail trail
 		return RobotPlayer.rc.canMove(dir);
 	}
-	
+
 	public static boolean closeToEnemyHQ(MapLocation loc){
 		return RobotPlayer.enemyHQ.distanceSquaredTo(loc)<=RobotType.HQ.attackRadiusMaxSquared;
 	}
-	
+
 	public static void tryToMove(Direction chosenDirection,boolean selfAvoiding,boolean avoidEnemyHQ, boolean sneak) throws GameActionException{
 		while(snailTrail.size()<2)
 			snailTrail.add(new MapLocation(-1,-1));
@@ -55,5 +55,5 @@ public class BasicPathing{
 			//System.out.println("I am at "+rc.getLocation()+", trail "+snailTrail.get(0)+snailTrail.get(1)+snailTrail.get(2));
 		}
 	}
-	
+
 }

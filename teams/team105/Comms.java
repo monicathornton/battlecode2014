@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import battlecode.common.*;
 
 public class Comms{
-	
+
 	static RobotController rc;
 	static int[] lengthOfEachPath = new int[100];
 
@@ -20,7 +20,7 @@ public class Comms{
 		RobotPlayer.myBand = -locationInt*100;
 		return downloadedPath;
 	}
-	
+
 
 	public static void findPathAndBroadcast(int bandID,MapLocation start, MapLocation goal, int bigBoxSize, int joinSquadNo) throws GameActionException{
 		//tell robots where to go
@@ -38,5 +38,5 @@ public class Comms{
 			rc.broadcast(band, Clock.getRoundNum());
 		}
 	}
-	
+
 }
