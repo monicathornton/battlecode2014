@@ -6,14 +6,14 @@ import java.util.Random;
 
 public class RobotPlayer{
 
-	public static RobotController rc;								//We know what this is
+	public static RobotController rc;	//We know what this is
 
-	static Direction allDirections[] = Direction.values();			//randomly selects direction
+	static Direction allDirections[] = Direction.values();	//randomly selects direction
 
-	static MapLocation pastrs[];
+	static MapLocation pastrs[];	
 	static MapLocation target;		
 
-	static Random rng = new Random();								//used for Random Number Generation (R-N-G)		
+	static Random rng = new Random();	//used for Random Number Generation (R-N-G)		
 
 	static int d = 0;
 
@@ -21,6 +21,8 @@ public class RobotPlayer{
 	static boolean pastr = false;		//Used for soldiers to turn into pastrs
 	static boolean init = true;
 	static boolean deny = false;
+	static int count = 0;
+	static int spawnC = 1;
 
 	//static RobotInfo anEnemyInfo;
 
@@ -63,8 +65,7 @@ public class RobotPlayer{
 
 	private static void runNoiseTower() throws GameActionException
 	{	
-		//This is for the starting noiseTowers and makes sure they shoot on the map, not off of it 		
-		if(!deny){
+		if(tower == false){
 			if (rc.getLocation().isAdjacentTo(target) || rc.senseTerrainTile(target) == TerrainTile.OFF_MAP){			
 				if(d >= 7){
 					d = 0;							
@@ -82,13 +83,6 @@ public class RobotPlayer{
 				rc.attackSquare(target);
 				target = target.subtract(allDirections[d]);
 			}
-			//This section of code is for a soldier that is denying a enemy Pastr until our soldiers can destroy it			
-		}else{
-			if(rc.canAttackSquare(target)){
-				rc.attackSquare(target);
-			}
-		}
-
 	}
 
 
@@ -96,51 +90,48 @@ public class RobotPlayer{
 
 
 	private static void runSoldier() throws GameActionException 
-	{		
-		//Classifies a soldier as a starting tower		
-		if(Clock.getRoundNum() < 22)	{tower = true;}
+	{
+	//Checks the map size to change starting locations for parts and noise towers
+		if(rc.getMapWidth() > 90 && rc.getMapWidth() > 40){
+			//Classifies a soldier as a starting tower		
+			if(Clock.getRoundNum() < 21)	{tower = true;}
 
-		//Classifies a soldier as a starting pastr			
-		else if(Clock.getRoundNum() < 45)	{pastr = true;}
+			//Classifies a soldier as a starting pastr			
+			else if(Clock.getRoundNum() < 73)	{pastr = true;}
 
-		//Information conversion to shoot nearby enemies, if there are enemies we can shoot
-		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,rc.getType().attackRadiusMaxSquared,rc.getTeam().opponent());
-		if(enemyRobots.length > 0){			
-			Robot anEnemy = enemyRobots[0];
-			RobotInfo anEnemyInfo;
+			//Information conversion to shoot nearby enemies, if there are enemies we can shoot
+			Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,rc.getType().attackRadiusMaxSquared,rc.getTeam().opponent());
+			if(enemyRobots.length > 0){			
+				Robot anEnemy = enemyRobots[0];
+				RobotInfo anEnemyInfo;
 
-			try {
-				anEnemyInfo = rc.senseRobotInfo(anEnemy);
+				try {
+					anEnemyInfo = rc.senseRobotInfo(anEnemy);
 
-				if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation()) < rc.getType().attackRadiusMaxSquared){					
-					if(rc.isActive()){
-
-						rc.attackSquare(anEnemyInfo.location);					
+					if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation()) < rc.getType().attackRadiusMaxSquared){					
+						if(rc.isActive()){
+							rc.attackSquare(anEnemyInfo.location);					
+						}
 					}
-				}else if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation()) < rc.getType().NOISETOWER.attackRadiusMaxSquared){					
-					if(anEnemyInfo.type == rc.getType().PASTR & rc.isActive()){
-
-						deny = true;
-						target = anEnemyInfo.location;
-						rc.construct(RobotType.NOISETOWER);
-					}
+				} catch (GameActionException e) {
+					e.printStackTrace();
 				}
-			} catch (GameActionException e) {	
-
-				e.printStackTrace();
 			}
-		}
-		//If we didn't shoot anything or find any nearby enemy pastrs, move in a random direction		
-		Direction d = allDirections[rng.nextInt(8) + 1];
-		//Direction d = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-		if(rc.isActive() && rc.canMove(d))		
-			rc.sneak(d);
+			if((tower || pastr) && count < 70){
+				//If we didn't shoot anything or find any nearby enemy pastrs, move in a random direction		
+				Direction d = Direction.EAST;
+				//Direction d = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+				if(rc.isActive() && rc.canMove(d))		
+					rc.move(d);
+				count++;
+			}
 
-		//Used for starting spawn of NoiseTower and Pastr		
-		if(tower && rc.isActive()){
-			rc.construct(RobotType.NOISETOWER);
-		}else if(pastr && rc.isActive()){
-			rc.construct(RobotType.PASTR);
+			//Used for starting spawn of NoiseTower and Pastr		
+			if(tower && rc.isActive() && count >= 70){
+				rc.construct(RobotType.NOISETOWER);
+			}else if(pastr && rc.isActive() && count >= 70){
+				rc.construct(RobotType.PASTR);
+			}
 		}
 	}
 
@@ -159,8 +150,13 @@ public class RobotPlayer{
 				}
 			}catch (Exception e)	{e.printStackTrace();}
 		}
-		Direction spawnDir = allDirections[rng.nextInt(8) + 1];											//pick a random spawn direction
+		Direction spawnDir = allDirections[spawnC];											//pick a random spawn direction
 		if(rc.isActive() && rc.canMove(spawnDir) && rc.senseRobotCount() < GameConstants.MAX_ROBOTS)	//usual checks (can we spawn)		{
-			rc.spawn(spawnDir);	
+			rc.spawn(spawnDir);
+		if(spawnC > 7){
+			spawnC = 0;
+		}else{
+			spawnC++;
+		}			
 	}
 }
