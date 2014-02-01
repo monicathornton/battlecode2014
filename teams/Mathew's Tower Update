@@ -7,20 +7,24 @@ import java.util.Random;
 public class RobotPlayer{
 
 	public static RobotController rc;								//We know what this is
-	static Direction allDirections[] = Direction.values();			//randomly selects direction	
+
+	static Direction allDirections[] = Direction.values();			//randomly selects direction
+
 	static MapLocation pastrs[];
-	static Random rng = new Random();								//used for Random Number Generation (R-N-G)		
 	static MapLocation target;		
+
+	static Random rng = new Random();								//used for Random Number Generation (R-N-G)		
+
 	static int d = 0;
+
+	static boolean tower = false;		//Used for soldiers to turn into towers
+	static boolean pastr = false;		//Used for soldiers to turn into pastrs
 	static boolean init = true;
 	static boolean deny = false;
-	static RobotInfo anEnemyInfo;
-	static Robot anEnemy;
-	
-	//This code has the noise towers skip off-map sweeps (speeds up gathering)
-	//Going to add moving away from HQ before constructing
-	//Working on soldiers denying pastrs
-  //HQ wears hat also :3
+
+	//static RobotInfo anEnemyInfo;
+
+	//static Robot anEnemy;
 
 	public static void run(RobotController rc_in)
 	{		
@@ -35,6 +39,8 @@ public class RobotPlayer{
 		while(true)
 		{
 			try{
+				if(rc.getHealth() < 25.0 && rc.isActive())	{rc.selfDestruct();}	
+
 				if(rc.getType()==RobotType.HQ){						//Existential HQ (Who am I?)				
 					runHeadquarters();
 
@@ -56,9 +62,9 @@ public class RobotPlayer{
 
 
 	private static void runNoiseTower() throws GameActionException
-	{		
-		boolean attack = false;
-		if(deny == false){
+	{	
+		//This is for the starting noiseTowers and makes sure they shoot on the map, not off of it 		
+		if(!deny){
 			if (rc.getLocation().isAdjacentTo(target) || rc.senseTerrainTile(target) == TerrainTile.OFF_MAP){			
 				if(d >= 7){
 					d = 0;							
@@ -76,23 +82,13 @@ public class RobotPlayer{
 				rc.attackSquare(target);
 				target = target.subtract(allDirections[d]);
 			}
+			//This section of code is for a soldier that is denying a enemy Pastr until our soldiers can destroy it			
+		}else{
+			if(rc.canAttackSquare(target)){
+				rc.attackSquare(target);
+			}
 		}
-		//		}else{
-		//			Robot[] enemies = rc.senseNearbyGameObjects(Robot.class, 10, rc.getTeam().opponent());
-		//			if(enemies.length > 0){
-		//				for(int i = 0; i < enemies.length; i++){
-		//					anEnemy = enemies[i];
-		//					anEnemyInfo = rc.senseRobotInfo(anEnemy);
-		//					if(anEnemyInfo.type == rc.getType().PASTR && anEnemyInfo.location.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){
-		//						attack = true;
-		//						break;						
-		//						}
-		//					}
-		//				if(rc.isActive() && attack){
-		//					rc.attackSquare(anEnemyInfo.location);
-		//				}				
-		//			}
-		//		}
+
 	}
 
 
@@ -101,59 +97,68 @@ public class RobotPlayer{
 
 	private static void runSoldier() throws GameActionException 
 	{		
-		if(rc.senseRobotCount() < 2)
-			if(rc.isActive())
-				rc.construct(RobotType.NOISETOWER);
-		if(rc.senseRobotCount() < 4)
-			if(rc.isActive())
-				rc.construct(RobotType.PASTR);		
+		//Classifies a soldier as a starting tower		
+		if(Clock.getRoundNum() < 22)	{tower = true;}
 
-		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10,rc.getTeam().opponent());
-		if(enemyRobots.length > 0){//if there are enemies
+		//Classifies a soldier as a starting pastr			
+		else if(Clock.getRoundNum() < 45)	{pastr = true;}
+
+		//Information conversion to shoot nearby enemies, if there are enemies we can shoot
+		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,rc.getType().attackRadiusMaxSquared,rc.getTeam().opponent());
+		if(enemyRobots.length > 0){			
 			Robot anEnemy = enemyRobots[0];
 			RobotInfo anEnemyInfo;
+
 			try {
 				anEnemyInfo = rc.senseRobotInfo(anEnemy);
-				if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){
+
+				if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation()) < rc.getType().attackRadiusMaxSquared){					
 					if(rc.isActive()){
-						rc.attackSquare(anEnemyInfo.location);
+
+						rc.attackSquare(anEnemyInfo.location);					
+					}
+				}else if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation()) < rc.getType().NOISETOWER.attackRadiusMaxSquared){					
+					if(anEnemyInfo.type == rc.getType().PASTR & rc.isActive()){
+
+						deny = true;
+						target = anEnemyInfo.location;
+						rc.construct(RobotType.NOISETOWER);
 					}
 				}
-			} catch (GameActionException e) {
-				// TODO Auto-generated catch block
+			} catch (GameActionException e) {	
+
 				e.printStackTrace();
 			}
 		}
+		//If we didn't shoot anything or find any nearby enemy pastrs, move in a random direction		
 		Direction d = allDirections[rng.nextInt(8) + 1];
 		//Direction d = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
 		if(rc.isActive() && rc.canMove(d))		
 			rc.sneak(d);
+
+		//Used for starting spawn of NoiseTower and Pastr		
+		if(tower && rc.isActive()){
+			rc.construct(RobotType.NOISETOWER);
+		}else if(pastr && rc.isActive()){
+			rc.construct(RobotType.PASTR);
+		}
 	}
 
 
 	private static void runHeadquarters() throws GameActionException 
 	{
-		int t = Clock.getRoundNum();
-		if(t <= 1){
-			rc.wearHat();
-		}
-		Robot[] enemies = rc.senseNearbyGameObjects(Robot.class, 10, rc.getTeam().opponent());
+		//HQ Shoots baddies and kills em' dead		
+		Robot[] enemies = rc.senseNearbyGameObjects(Robot.class, rc.getType().attackRadiusMaxSquared, rc.getTeam().opponent());
 		if(enemies.length > 0){
 			Robot anEnemy = enemies[0];
 			RobotInfo anEnemyInfo;
 			try{
 				anEnemyInfo = rc.senseRobotInfo(anEnemy);
-
 				if(anEnemyInfo.location.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){
-					if(rc.isActive()){
-						rc.attackSquare(anEnemyInfo.location);
-					}
+					if(rc.isActive())	{rc.attackSquare(anEnemyInfo.location);}				
 				}
-			}catch (Exception e){
-				System.out.println(e);
-			}
+			}catch (Exception e)	{e.printStackTrace();}
 		}
-
 		Direction spawnDir = allDirections[rng.nextInt(8) + 1];											//pick a random spawn direction
 		if(rc.isActive() && rc.canMove(spawnDir) && rc.senseRobotCount() < GameConstants.MAX_ROBOTS)	//usual checks (can we spawn)		{
 			rc.spawn(spawnDir);	
